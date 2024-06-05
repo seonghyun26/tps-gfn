@@ -1,0 +1,38 @@
+# system
+molecule: alanine
+project: tps-tune
+seed: 0
+type: train
+device: cuda
+wandb: True
+
+# logger
+logger: True
+freq_rollout_csave: 20
+save_freq: 100
+server: server
+
+# policy
+force: False
+
+# sampling, molecule
+state_state: c5
+end_state: c7ax
+reward_matrix: dist
+bias_scale: 20
+num_samples: 16
+std: 0.05
+temperature: 0
+
+# training
+learning_rate: 0.01
+start_std: 0.2
+end_std: 0.1
+num_rollouts: 1000
+trains_per_rollout: 2000
+buffer_size: 100
+max_grad_norm: 10
+
+# Additional
+optimizer: sgd
+scheduler: exp

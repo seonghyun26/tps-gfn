@@ -12,7 +12,41 @@ class FlowNetAgent:
         self.std = torch.tensor(md.std.value_in_unit(unit.nanometer/unit.femtosecond), dtype=torch.float, device=args.device)
         self.masses = torch.tensor(md.masses.value_in_unit(md.masses.unit), dtype=torch.float, device=args.device).unsqueeze(-1)
         self.policy = getattr(proxy, args.molecule.title())(args, md)
-
+        
+        if hasattr(args, "log_z_optimizer") == False:
+            raise ValueError('Please set an optimizer')
+        elif args.log_z_optimizer.lower() == 'sgd':
+            self.log_z_optimizer = torch.optim.SGD([self.policy.log_z], lr=args.log_z_lr)
+        elif args.log_z_optimizer.lower() == 'adam':
+            self.log_z_optimizer = torch.optim.Adam([self.policy.log_z], lr=args.log_z_lr)
+        else:
+            raise ValueError('Invalid optimizer')        
+        if hasattr(args, "log_z_scheduler") == False:
+            self.log_z_scheduler = None
+        elif args.log_z_scheduler.lower() == "exp":
+            self.log_z_scheduler = ExponentialLR(self.log_z_optimizer, gamma=0.9)
+        elif args.log_z_scheduler.lower() == "multistep":
+            self.log_z_scheduler = MultiStepLR(self.log_z_optimizer, milestones=[30,80], gamma=0.1)
+        else:
+            raise ValueError('Invalid Scheduler or to be implemented')
+        
+        if hasattr(args, "mlp_optimizer") == False:
+            raise ValueError('Please set an optimizer')
+        elif args.mlp_optimizer.lower() == 'sgd':
+            self.mlp_optimizer = torch.optim.SGD(self.policy.mlp.parameters(), lr=args.mlp_lr)
+        elif args.mlp_optimizer.lower() == 'adam':
+            self.mlp_optimizer = torch.optim.Adam(self.policy.mlp.parameters(), lr=args.mlp_lr)
+        else:
+            raise ValueError('Invalid optimizer')
+        if hasattr(args, "mlp_scheduler") == False:
+            self.mlp_scheduler = None
+        elif args.mlp_scheduler.lower() == "exp":
+            self.mlp_scheduler = ExponentialLR(self.mlp_optimizer, gamma=0.9)
+        elif args.mlp_scheduler.lower() == "multistep":
+            self.mlp_scheduler = MultiStepLR(self.mlp_optimizer, milestones=[30,80], gamma=0.1)
+        else:
+            raise ValueError('Invalid Scheduler or to be implemented')
+        
         if args.type == 'train':
             self.replay = ReplayBuffer(args, md)
 
@@ -60,7 +94,7 @@ class FlowNetAgent:
         
         log_reward = log_md_reward + log_target_reward
 
-        log_likelihood = (-1/2)*torch.square(noises).mean((1, 2, 3))
+        log_likelihood = (-1/2)*torch.square(noise).mean((1, 2, 3))
 
         if args.type == 'train':
             self.replay.add((positions, actions, log_reward))
@@ -76,8 +110,8 @@ class FlowNetAgent:
         return log
 
     def train(self, args):
-        log_z_optimizer = torch.optim.Adam([self.policy.log_z], lr=args.log_z_lr)
-        mlp_optimizer = torch.optim.Adam(self.policy.mlp.parameters(), lr=args.mlp_lr)
+        # log_z_optimizer = torch.optim.Adam([self.policy.log_z], lr=args.log_z_lr)
+        # mlp_optimizer = torch.optim.Adam(self.policy.mlp.parameters(), lr=args.mlp_lr)
 
         positions, actions, log_reward = self.replay.sample()
 
@@ -94,11 +128,16 @@ class FlowNetAgent:
         torch.nn.utils.clip_grad_norm_(self.policy.log_z, args.max_grad_norm)
         torch.nn.utils.clip_grad_norm_(self.policy.mlp.parameters(), args.max_grad_norm)
         
-        mlp_optimizer.step()
-        log_z_optimizer.step()
-        mlp_optimizer.zero_grad()
-        log_z_optimizer.zero_grad()
+        self.mlp_optimizer.step()
+        self.log_z_optimizer.step()
+        self.mlp_optimizer.zero_grad()
+        self.log_z_optimizer.zero_grad()
+        
         return loss.item()
+    
+    def scheduler_update(self):
+        self.log_z_scheduler.step()
+        self.mlp_scheduler.step()
 
 class ReplayBuffer:
     def __init__(self, args, md):

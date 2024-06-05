@@ -12,7 +12,7 @@ class Logger():
         self.type = args.type
         self.wandb = args.wandb
         self.molecule = args.molecule
-        self.flexible = args.flexible
+        # self.flexible = args.flexible
         self.start_file = md.start_file
         self.save_freq = args.save_freq if args.type == 'train' else 1
 

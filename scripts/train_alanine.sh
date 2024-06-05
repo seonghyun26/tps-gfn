@@ -1,1 +1,3 @@
-CUDA_VISIBLE_DEVICES=0 python src/train.py
+CUDA_VISIBLE_DEVICES=$1 python src/train.py \
+  --project tps-tune \
+  # --wandb

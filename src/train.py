@@ -11,6 +11,7 @@ from utils.logging import Logger
 parser = argparse.ArgumentParser()
 
 # System Config
+parser.add_argument('--config', default="", type=str, help='Path to config file')
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--type', default='train', type=str)
 parser.add_argument('--device', default='cuda', type=str)
@@ -40,7 +41,9 @@ parser.add_argument('--temperature', default=300, type=float, help='Temperature 
 parser.add_argument('--train_temperature', default=600, type=float, help='Temperature for training')
 parser.add_argument('--max_grad_norm', default=10, type=int, help='Maximum norm of gradient to clip')
 parser.add_argument('--num_rollouts', default=5000, type=int, help='Number of rollouts (or sampling)')
+parser.add_argument('--log_z_optimizer', default="adam", type=str, help='Optimizer for log Z')
 parser.add_argument('--log_z_lr', default=1e-2, type=float, help='Learning rate of estimator for log Z')
+parser.add_argument('--mlp_optimizer', default="adam", type=str, help='Optimizer for MLP')
 parser.add_argument('--mlp_lr', default=1e-4, type=float, help='Learning rate of bias potential or force')
 parser.add_argument('--buffer_size', default=2048, type=int, help='Size of buffer which stores sampled paths')
 parser.add_argument('--trains_per_rollout', default=2000, type=int, help='Number of training per rollout in a rollout')
@@ -48,9 +51,19 @@ parser.add_argument('--trains_per_rollout', default=2000, type=int, help='Number
 args = parser.parse_args()
 
 if __name__ == '__main__':
+    if args.config:
+        with open(args.config, 'r') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+            # for config_class in config.keys():
+            for key, value in config.items():
+                setattr(args, key, value)
+                
     torch.manual_seed(args.seed)
     if args.wandb:
-        wandb.init(project=args.project, config=args)
+        wandb.init(
+            project=args.project,
+            config=args
+        )
 
     md = getattr(dynamics, args.molecule.title())(args, args.start_state)
     agent = FlowNetAgent(args, md)
