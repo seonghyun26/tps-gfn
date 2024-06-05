@@ -26,7 +26,7 @@ class Logger():
                 os.makedirs(f'{self.save_dir}/{name}')
 
         # Logger basic configurations
-        self.logger = logging.getLogger("tps")
+        self.logger = logging.getLogger("TPS")
         self.logger.setLevel(logging.INFO)
         
         # File handler

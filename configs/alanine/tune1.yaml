@@ -1,39 +1,37 @@
-# system:
+# System
+type: train
+server: server
+device: cuda
+seed: 0
+
+# Logger
+wandb: True
+save_freq: 100
+save_dir: results
 molecule: alanine
 project: tps-tune
-seed: 0
-type: train
-device: cuda
+date: reproduce
 
-# logger:
-freq_rollout_csave: 20
-server: server
-
-# policy:
-force: False
-goal_conditioned: False
-
-# molecule
-bias_scale: 0.4
-std: 0.05
-start_std: 0.2
-end_std: 0.1
-hindsight: false
-terminal_std: 0.05
-
-# training:
-loss: tb
-learning_rate: 0.01
-num_rollouts: 1000
-trains_per_rollout: 2000
-buffer_size: 100
-max_grad_norm: 10
-optimizer: sgd
-scheduler: exp
-
-# sampling:
-start_states: c5
-end_states: c7ax
-num_steps: 2000
+# Sampling
+state_state: c5
+end_state: c7ax
+num_steps: 500
+bias_scale: 0.01
+timestep: 1
+sigma: 0.05
 num_samples: 16
-temperature: 0
+temperature: 300
+
+# Training
+num_rollouts: 5000
+trains_per_rollout: 200
+train_temperature: 600
+log_z_optimizer: adam
+log_z_lr: 0.01
+log_z_scheduler: exp
+mlp_optimizer: adam
+mlp_lr: 0.0001
+mlp_scheduler: exp
+max_grad_norm: 10
+buffer_size: 2048
+force: False

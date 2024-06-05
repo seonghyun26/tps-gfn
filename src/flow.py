@@ -4,6 +4,8 @@ from tqdm import tqdm
 import openmm.unit as unit
 from utils.utils import pairwise_dist 
 
+from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, CosineAnnealingLR
+
 class FlowNetAgent:
     def __init__(self, args, md):
         self.num_particles = md.num_particles
@@ -27,6 +29,8 @@ class FlowNetAgent:
             self.log_z_scheduler = ExponentialLR(self.log_z_optimizer, gamma=0.9)
         elif args.log_z_scheduler.lower() == "multistep":
             self.log_z_scheduler = MultiStepLR(self.log_z_optimizer, milestones=[30,80], gamma=0.1)
+        elif args.log_z_scheduler.lower() == "cosineanneal":
+            self.log_z_scheduler = CosineAnnealingLR(self.log_z_optimizer, T_max=100, eta_min=0)
         else:
             raise ValueError('Invalid Scheduler or to be implemented')
         
@@ -44,6 +48,8 @@ class FlowNetAgent:
             self.mlp_scheduler = ExponentialLR(self.mlp_optimizer, gamma=0.9)
         elif args.mlp_scheduler.lower() == "multistep":
             self.mlp_scheduler = MultiStepLR(self.mlp_optimizer, milestones=[30,80], gamma=0.1)
+        elif args.mlp_scheduler.lower() == "cosineanneal":
+            self.mlp_scheduler = CosineAnnealingLR(self.mlp_optimizer, T_max=100, eta_min=0)
         else:
             raise ValueError('Invalid Scheduler or to be implemented')
         
@@ -94,7 +100,7 @@ class FlowNetAgent:
         
         log_reward = log_md_reward + log_target_reward
 
-        log_likelihood = (-1/2)*torch.square(noise).mean((1, 2, 3))
+        log_likelihood = (-1/2)*torch.square(noise).mean((0, 1, 2))
 
         if args.type == 'train':
             self.replay.add((positions, actions, log_reward))
