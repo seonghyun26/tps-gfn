@@ -28,8 +28,10 @@ trains_per_rollout: 200
 train_temperature: 600
 log_z_lr: 0.01
 log_z_optimizer: adam
+log_z_scheduler: cosineanneal
 mlp_lr: 0.0001
 mlp_optimizer: adam
+mlp_scheduler: cosineanneal
 max_grad_norm: 10
 buffer_size: 2048
 force: False

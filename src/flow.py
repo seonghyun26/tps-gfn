@@ -4,7 +4,8 @@ from tqdm import tqdm
 import openmm.unit as unit
 from utils.utils import pairwise_dist 
 
-from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, CosineAnnealingLR
+# from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, CosineAnnealingLR
+from utils.optim import set_optimizer, set_scheduler
 
 class FlowNetAgent:
     def __init__(self, args, md):
@@ -13,45 +14,13 @@ class FlowNetAgent:
         self.f_scale = torch.tensor(md.f_scale.value_in_unit(unit.femtosecond), dtype=torch.float, device=args.device)
         self.std = torch.tensor(md.std.value_in_unit(unit.nanometer/unit.femtosecond), dtype=torch.float, device=args.device)
         self.masses = torch.tensor(md.masses.value_in_unit(md.masses.unit), dtype=torch.float, device=args.device).unsqueeze(-1)
+        
         self.policy = getattr(proxy, args.molecule.title())(args, md)
         
-        if hasattr(args, "log_z_optimizer") == False:
-            raise ValueError('Please set an optimizer')
-        elif args.log_z_optimizer.lower() == 'sgd':
-            self.log_z_optimizer = torch.optim.SGD([self.policy.log_z], lr=args.log_z_lr)
-        elif args.log_z_optimizer.lower() == 'adam':
-            self.log_z_optimizer = torch.optim.Adam([self.policy.log_z], lr=args.log_z_lr)
-        else:
-            raise ValueError('Invalid optimizer')        
-        if hasattr(args, "log_z_scheduler") == False:
-            self.log_z_scheduler = None
-        elif args.log_z_scheduler.lower() == "exp":
-            self.log_z_scheduler = ExponentialLR(self.log_z_optimizer, gamma=0.9)
-        elif args.log_z_scheduler.lower() == "multistep":
-            self.log_z_scheduler = MultiStepLR(self.log_z_optimizer, milestones=[30,80], gamma=0.1)
-        elif args.log_z_scheduler.lower() == "cosineanneal":
-            self.log_z_scheduler = CosineAnnealingLR(self.log_z_optimizer, T_max=100, eta_min=0)
-        else:
-            raise ValueError('Invalid Scheduler or to be implemented')
-        
-        if hasattr(args, "mlp_optimizer") == False:
-            raise ValueError('Please set an optimizer')
-        elif args.mlp_optimizer.lower() == 'sgd':
-            self.mlp_optimizer = torch.optim.SGD(self.policy.mlp.parameters(), lr=args.mlp_lr)
-        elif args.mlp_optimizer.lower() == 'adam':
-            self.mlp_optimizer = torch.optim.Adam(self.policy.mlp.parameters(), lr=args.mlp_lr)
-        else:
-            raise ValueError('Invalid optimizer')
-        if hasattr(args, "mlp_scheduler") == False:
-            self.mlp_scheduler = None
-        elif args.mlp_scheduler.lower() == "exp":
-            self.mlp_scheduler = ExponentialLR(self.mlp_optimizer, gamma=0.9)
-        elif args.mlp_scheduler.lower() == "multistep":
-            self.mlp_scheduler = MultiStepLR(self.mlp_optimizer, milestones=[30,80], gamma=0.1)
-        elif args.mlp_scheduler.lower() == "cosineanneal":
-            self.mlp_scheduler = CosineAnnealingLR(self.mlp_optimizer, T_max=100, eta_min=0)
-        else:
-            raise ValueError('Invalid Scheduler or to be implemented')
+        self.log_z_optimizer = set_optimizer(args.log_z_optimizer, [self.policy.log_z], args.log_z_lr)    
+        self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer)
+        self.mlp_optimizer = set_optimizer(args.mlp_optimizer, self.policy.mlp.parameters(), args.mlp_lr) 
+        self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer)
         
         if args.type == 'train':
             self.replay = ReplayBuffer(args, md)
@@ -90,17 +59,25 @@ class FlowNetAgent:
 
         log_md_reward = -0.5 * torch.square(actions/self.std).mean((1, 2, 3))
         
-        target_pd = pairwise_dist(mds.target_position)
-
-        log_target_reward = torch.zeros(args.num_samples, args.num_steps+1, device=args.device)
-        for i in range(args.num_samples):
-            pd = pairwise_dist(positions[i])
-            log_target_reward[i] = - torch.square((pd-target_pd)/args.sigma).mean((1, 2))
-        log_target_reward, last_idx = log_target_reward.max(1)
+        # NOTE: Calculate log reward
+        # target_pd = pairwise_dist(mds.target_position)
+        # log_target_reward = torch.zeros(args.num_samples, args.num_steps+1, device=args.device)
+        # for i in range(args.num_samples):
+        #     pd = pairwise_dist(positions[i])
+        #     log_target_reward[i] = - torch.square((pd-target_pd)/args.sigma).mean((1, 2))
+        # log_target_reward, last_idx = log_target_reward.max(1)
+        # log_reward = log_md_reward + log_target_reward
         
-        log_reward = log_md_reward + log_target_reward
+        # NOTE: Another method to calculate log reward
+        log_target_reward = torch.zeros(args.num_samples, args.num_steps, device=args.device)
+        for i in range(args.num_samples) :    
+            aligned_target_position, rmsd = kabsch(mds.target_position, positions[i][1:])
+            target_velocity = (aligned_target_position - positions[ill:-1]) / args.timestep
+            log_target_reward[i] = -0.5 * torch.square((target_velocity-velocities[i][1:])/self.std).mean((1, 2))
+        # print (log_target_reward)
+        log_target_reward, last_idx = log_target_reward.max
 
-        log_likelihood = (-1/2)*torch.square(noise).mean((0, 1, 2))
+        log_likelihood = (-1/2) * torch.square(noise).mean((0, 1, 2))
 
         if args.type == 'train':
             self.replay.add((positions, actions, log_reward))
