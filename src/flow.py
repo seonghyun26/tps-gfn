@@ -21,6 +21,8 @@ class FlowNetAgent:
         self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer)
         self.mlp_optimizer = set_optimizer(args.mlp_optimizer, self.policy.mlp.parameters(), args.mlp_lr) 
         self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer)
+        self.log_z_lr = self.log_z_scheduler.get_last_lr()[0]
+        self.mlp_lr = self.mlp_scheduler.get_last_lr()[0]
         
         if args.type == 'train':
             self.replay = ReplayBuffer(args, md)
@@ -60,22 +62,23 @@ class FlowNetAgent:
         log_md_reward = -0.5 * torch.square(actions/self.std).mean((1, 2, 3))
         
         # NOTE: Calculate log reward
-        # target_pd = pairwise_dist(mds.target_position)
-        # log_target_reward = torch.zeros(args.num_samples, args.num_steps+1, device=args.device)
-        # for i in range(args.num_samples):
-        #     pd = pairwise_dist(positions[i])
-        #     log_target_reward[i] = - torch.square((pd-target_pd)/args.sigma).mean((1, 2))
-        # log_target_reward, last_idx = log_target_reward.max(1)
-        # log_reward = log_md_reward + log_target_reward
+        target_pd = pairwise_dist(mds.target_position)
+        log_target_reward = torch.zeros(args.num_samples, args.num_steps+1, device=args.device)
+        for i in range(args.num_samples):
+            pd = pairwise_dist(positions[i])
+            log_target_reward[i] = - torch.square((pd-target_pd)/args.sigma).mean((1, 2))
+        log_target_reward, last_idx = log_target_reward.max(1)
         
         # NOTE: Another method to calculate log reward
-        log_target_reward = torch.zeros(args.num_samples, args.num_steps, device=args.device)
-        for i in range(args.num_samples) :    
-            aligned_target_position, rmsd = kabsch(mds.target_position, positions[i][1:])
-            target_velocity = (aligned_target_position - positions[ill:-1]) / args.timestep
-            log_target_reward[i] = -0.5 * torch.square((target_velocity-velocities[i][1:])/self.std).mean((1, 2))
-        # print (log_target_reward)
-        log_target_reward, last_idx = log_target_reward.max
+        # log_target_reward = torch.zeros(args.num_samples, args.num_steps, device=args.device)
+        # for i in range(args.num_samples) :    
+        #     aligned_target_position, rmsd = kabsch(mds.target_position, positions[i][1:])
+        #     target_velocity = (aligned_target_position - positions[ill:-1]) / args.timestep
+        #     log_target_reward[i] = -0.5 * torch.square((target_velocity-velocities[i][1:])/self.std).mean((1, 2))
+        # # print (log_target_reward)
+        # log_target_reward, last_idx = log_target_reward.max
+        
+        log_reward = log_md_reward + log_target_reward
 
         log_likelihood = (-1/2) * torch.square(noise).mean((0, 1, 2))
 
@@ -89,6 +92,8 @@ class FlowNetAgent:
             'potentials': potentials,
             'target_position': mds.target_position,
             'last_position': positions[torch.arange(args.num_samples), last_idx],
+            'log_z_lr': self.log_z_lr,
+            'mlp_lr': self.mlp_lr
         }
         return log
 
@@ -121,6 +126,8 @@ class FlowNetAgent:
     def scheduler_update(self):
         self.log_z_scheduler.step()
         self.mlp_scheduler.step()
+        self.log_z_lr = self.log_z_scheduler.get_last_lr()[0]
+        self.mlp_lr = self.mlp_scheduler.get_last_lr()[0]
 
 class ReplayBuffer:
     def __init__(self, args, md):

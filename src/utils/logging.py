@@ -64,6 +64,8 @@ class Logger():
             potentials, 
             last_position,
             target_position,
+            log_z_lr=0,
+            mlp_lr=0
         ):
 
         # Calculate metrics
@@ -96,6 +98,8 @@ class Logger():
                     'std_pd': std_pd,
                     'std_pcd': std_pcd,
                     'std_len': std_len,
+                    'log_z_lr': log_z_lr,
+                    'mlp_lr': mlp_lr
                 }
 
             if self.molecule in ['alanine', 'histidine']:
@@ -119,6 +123,8 @@ class Logger():
         self.logger.info(f"std_pd: {std_pd}")
         self.logger.info(f"std_pcd: {std_pcd}")
         self.logger.info(f"std_len: {std_len}")
+        self.logger.info(f"log_z_lr: {log_z_lr}")
+        self.logger.info(f"mlp_lr: {mlp_lr}")
 
         if self.molecule in ['alanine', 'histidine']:
             self.logger.info(f"thp: {thp}")

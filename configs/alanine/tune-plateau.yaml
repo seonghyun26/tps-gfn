@@ -10,13 +10,12 @@ save_freq: 100
 save_dir: results
 molecule: alanine
 project: tps-tune
-date: reproduce
 
 # Sampling
 state_state: c5
 end_state: c7ax
 num_steps: 500
-bias_scale: 0.01
+bias_scale: 20
 timestep: 1
 sigma: 0.05
 num_samples: 16

@@ -27,10 +27,10 @@ trains_per_rollout: 200
 train_temperature: 600
 log_z_lr: 0.01
 log_z_optimizer: adam
-log_z_scheduler: exp
+log_z_scheduler: multistep
 mlp_lr: 0.0001
 mlp_optimizer: adam
-mlp_scheduler: exp
+mlp_scheduler: multistep
 max_grad_norm: 10
 buffer_size: 2048
 force: False

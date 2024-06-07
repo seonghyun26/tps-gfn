@@ -79,8 +79,8 @@ if __name__ == '__main__':
         print(f'Rollout: {rollout}')
 
         log = agent.sample(args, mds, args.train_temperature)
-
         loss = 0
+        
         for _ in tqdm(range(args.trains_per_rollout), desc='Training'):
             loss += agent.train(args)
         loss = loss / args.trains_per_rollout
