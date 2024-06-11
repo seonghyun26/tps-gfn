@@ -1,8 +1,6 @@
 # System
-type: train
 server: server
 device: cuda
-seed: 0
 
 # Logger
 wandb: True

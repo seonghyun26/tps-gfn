@@ -1,15 +1,17 @@
 # This file is designated for the fair comparisions of trajectory balance objective function 
 # to the prior work https://github.com/LarsHoldijk/SOCTransitionPaths
 
+import wandb
 import torch
 import proxy
 import random
-from tqdm import tqdm
-from utils.utils import pairwise_dist 
-
 import argparse
+
+from tqdm import tqdm
 from dynamics.mds import MDs
 from dynamics import dynamics
+# from flow import FlowNetAgent
+from utils.utils import pairwise_dist 
 from utils.logging import Logger
 
 

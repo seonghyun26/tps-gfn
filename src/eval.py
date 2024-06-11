@@ -1,4 +1,5 @@
 import os
+import yaml
 import wandb
 import torch
 import argparse
@@ -11,6 +12,7 @@ from utils.logging import Logger
 parser = argparse.ArgumentParser()
 
 # System Config
+parser.add_argument('--config', default="", type=str, help='Path to config file')
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--type', default='eval', type=str)
 parser.add_argument('--device', default='cuda', type=str)
@@ -26,6 +28,14 @@ parser.add_argument('--date', default="date", type=str, help='Date of the traini
 # Policy Config
 parser.add_argument('--force', action='store_true', help='Network predicts force')
 
+parser.add_argument('--log_z_optimizer', default="adam", type=str, help='Optimizer for log Z')
+parser.add_argument('--log_z_lr', default=1e-2, type=float, help='Learning rate of estimator for log Z')
+parser.add_argument('--log_z_scheduler', default="", type=str, help='Scheduler for log Z')
+parser.add_argument('--mlp_optimizer', default="adam", type=str, help='Optimizer for MLP')
+parser.add_argument('--mlp_lr', default=1e-4, type=float, help='Learning rate of bias potential or force')
+parser.add_argument('--mlp_scheduler', default="", type=str, help='Scheduler for MLP')
+
+
 # Sampling Config
 parser.add_argument('--start_state', default='c5', type=str)
 parser.add_argument('--end_state', default='c7ax', type=str)
@@ -39,8 +49,16 @@ parser.add_argument('--temperature', default=300, type=float, help='Temperature 
 args = parser.parse_args()
 
 if __name__ == '__main__':
+    if args.config:
+        with open(args.config, 'r') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+            # for config_class in config.keys():
+            for key, value in config.items():
+                setattr(args, key, value)
+                
+    torch.manual_seed(args.seed)
     if args.wandb:
-        wandb.init(project=args.project+'_eval', config=args)
+        wandb.init(project=args.project, config=args)
 
     md = getattr(dynamics, args.molecule.title())(args, args.start_state)
     agent = FlowNetAgent(args, md)

@@ -9,6 +9,7 @@ from utils.optim import set_optimizer, set_scheduler
 
 class FlowNetAgent:
     def __init__(self, args, md):
+        self.args = args
         self.num_particles = md.num_particles
         self.v_scale = torch.tensor(md.v_scale, dtype=torch.float, device=args.device)
         self.f_scale = torch.tensor(md.f_scale.value_in_unit(unit.femtosecond), dtype=torch.float, device=args.device)
@@ -18,11 +19,12 @@ class FlowNetAgent:
         self.policy = getattr(proxy, args.molecule.title())(args, md)
         
         self.log_z_optimizer = set_optimizer(args.log_z_optimizer, [self.policy.log_z], args.log_z_lr)    
-        self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer)
+        self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer, args)
         self.mlp_optimizer = set_optimizer(args.mlp_optimizer, self.policy.mlp.parameters(), args.mlp_lr) 
-        self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer)
-        self.log_z_lr = self.log_z_scheduler.get_last_lr()[0]
-        self.mlp_lr = self.mlp_scheduler.get_last_lr()[0]
+        self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer, args)
+        
+        self.log_z_lr = self.log_z_optimizer.param_groups[0]['lr'] if self.log_z_scheduler is not None else args.log_z_lr
+        self.mlp_lr = self.mlp_optimizer.param_groups[0]['lr'] if self.mlp_scheduler is not None else args.mlp_lr
         
         if args.type == 'train':
             self.replay = ReplayBuffer(args, md)
@@ -123,11 +125,19 @@ class FlowNetAgent:
         
         return loss.item()
     
-    def scheduler_update(self):
-        self.log_z_scheduler.step()
-        self.mlp_scheduler.step()
-        self.log_z_lr = self.log_z_scheduler.get_last_lr()[0]
-        self.mlp_lr = self.mlp_scheduler.get_last_lr()[0]
+    def scheduler_update(self, loss=0):
+        if self.log_z_scheduler is not None:
+            if self.args.log_z_scheduler == "plateau":
+                self.log_z_scheduler.step(loss)
+            else:
+                self.log_z_scheduler.step()
+            self.log_z_lr = self.log_z_optimizer.param_groups[0]['lr']
+        if self.mlp_scheduler is not None:
+            if self.args.mlp_scheduler == "plateau":
+                self.mlp_scheduler.step(loss)
+            else:
+                self.mlp_scheduler.step()
+            self.mlp_lr = self.mlp_optimizer.param_groups[0]['lr']
 
 class ReplayBuffer:
     def __init__(self, args, md):
