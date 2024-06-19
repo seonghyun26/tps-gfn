@@ -1,4 +1,5 @@
-CUDA_VISIBLE_DEVICES=0 python src/eval.py \
-  --config configs/alanine/tune-cosann.yaml \
-  --date 0610-004218 \
+CUDA_VISIBLE_DEVICES=7 python src/eval.py \
+  --type eval \
+  --config configs/alanine/tune-cosannrestart.yaml \
+  --date 0612-015704 \
   --seed 5

@@ -1,10 +1,9 @@
 import torch
 import proxy
-from tqdm import tqdm
 import openmm.unit as unit
-from utils.utils import pairwise_dist 
 
-# from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, CosineAnnealingLR
+from tqdm import tqdm
+from utils.utils import pairwise_dist 
 from utils.optim import set_optimizer, set_scheduler
 
 class FlowNetAgent:
@@ -17,17 +16,17 @@ class FlowNetAgent:
         self.masses = torch.tensor(md.masses.value_in_unit(md.masses.unit), dtype=torch.float, device=args.device).unsqueeze(-1)
         
         self.policy = getattr(proxy, args.molecule.title())(args, md)
+        if args.type == 'train':
+            self.replay = ReplayBuffer(args, md)
         
-        self.log_z_optimizer = set_optimizer(args.log_z_optimizer, [self.policy.log_z], args.log_z_lr)    
-        self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer, args)
+        # Set optimizer and scheduler for log z, mlp
+        self.log_z_optimizer = set_optimizer(args.log_z_optimizer, self.policy.log_z.parameters(), args.log_z_lr)    
+        self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer, lr=args.log_z_lr, args=args)
         self.mlp_optimizer = set_optimizer(args.mlp_optimizer, self.policy.mlp.parameters(), args.mlp_lr) 
-        self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer, args)
-        
+        self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer, lr=args.mlp_lr, args=args)
         self.log_z_lr = self.log_z_optimizer.param_groups[0]['lr'] if self.log_z_scheduler is not None else args.log_z_lr
         self.mlp_lr = self.mlp_optimizer.param_groups[0]['lr'] if self.mlp_scheduler is not None else args.mlp_lr
         
-        if args.type == 'train':
-            self.replay = ReplayBuffer(args, md)
 
     def sample(self, args, mds, temperature):
         positions = torch.zeros((args.num_samples, args.num_steps+1, self.num_particles, 3), device=args.device)
@@ -42,7 +41,9 @@ class FlowNetAgent:
 
         mds.set_temperature(temperature)
         for s in tqdm(range(args.num_steps), desc='Sampling'):
-            bias = args.bias_scale * self.policy(position.detach()).squeeze().detach()
+            # bias = args.bias_scale * self.policy(position.detach()).squeeze().detach()
+            position_n_target = torch.cat([position, mds.target_positions.squeeze()], dim=0)
+            bias = args.bias_scale * self.policy(position_n_target.detach()).squeeze().detach()
             mds.step(bias)
             
             next_position, velocity, force, potential = mds.report()
@@ -64,11 +65,15 @@ class FlowNetAgent:
         log_md_reward = -0.5 * torch.square(actions/self.std).mean((1, 2, 3))
         
         # NOTE: Calculate log reward
-        target_pd = pairwise_dist(mds.target_position)
+        target_pds = pairwise_dist(mds.target_positions)
+        target_pds = torch.stack([pairwise_dist(pos) for pos in mds.target_positions]).squeeze()
+        
+        
         log_target_reward = torch.zeros(args.num_samples, args.num_steps+1, device=args.device)
         for i in range(args.num_samples):
             pd = pairwise_dist(positions[i])
-            log_target_reward[i] = - torch.square((pd-target_pd)/args.sigma).mean((1, 2))
+            log_target_reward[i] = - torch.square((pd-target_pds[i])/args.sigma).mean((1, 2))
+            # log_target_reward[i] = - torch.square((pd-target_pds)/args.sigma).mean((1, 2))
         log_target_reward, last_idx = log_target_reward.max(1)
         
         # NOTE: Another method to calculate log reward
@@ -81,18 +86,17 @@ class FlowNetAgent:
         # log_target_reward, last_idx = log_target_reward.max
         
         log_reward = log_md_reward + log_target_reward
-
         log_likelihood = (-1/2) * torch.square(noise).mean((0, 1, 2))
 
         if args.type == 'train':
-            self.replay.add((positions, actions, log_reward))
+            self.replay.add((positions, actions, log_reward, mds.target_positions))
         
         log = {
             'actions': actions,
             'last_idx': last_idx,
             'positions': positions, 
             'potentials': potentials,
-            'target_position': mds.target_position,
+            'target_position': mds.target_positions,
             'last_position': positions[torch.arange(args.num_samples), last_idx],
             'log_z_lr': self.log_z_lr,
             'mlp_lr': self.mlp_lr
@@ -100,22 +104,21 @@ class FlowNetAgent:
         return log
 
     def train(self, args):
-        # log_z_optimizer = torch.optim.Adam([self.policy.log_z], lr=args.log_z_lr)
-        # mlp_optimizer = torch.optim.Adam(self.policy.mlp.parameters(), lr=args.mlp_lr)
-
-        positions, actions, log_reward = self.replay.sample()
+        positions, actions, log_reward, target_positions = self.replay.sample()
 
         biases = args.bias_scale * self.policy(positions[:, :-1])
         biases = 1e-6 * biases # kJ/(mol*nm) -> (da*nm)/fs**2
         biases = self.f_scale * biases / self.masses
         
-        log_z = self.policy.log_z
+        # start_n_goal = torch.stack((positions[:, 0].reshape(args.num_samples, -1), target_positions))
+        start_n_goal = torch.cat((positions[:, 0].reshape(args.num_samples, -1), target_positions.squeeze().reshape(args.num_samples, -1)), dim=1)
+        log_z = self.policy.log_z(start_n_goal)
         log_forward = -0.5 * torch.square((biases-actions)/self.std).mean((1, 2, 3))
         loss = (log_z+log_forward-log_reward).square().mean() 
         
         loss.backward()
         
-        torch.nn.utils.clip_grad_norm_(self.policy.log_z, args.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(self.policy.log_z.parameters(), args.max_grad_norm)
         torch.nn.utils.clip_grad_norm_(self.policy.mlp.parameters(), args.max_grad_norm)
         
         self.mlp_optimizer.step()
@@ -144,6 +147,7 @@ class ReplayBuffer:
         self.positions = torch.zeros((args.buffer_size, args.num_steps+1, md.num_particles, 3), device=args.device)
         self.actions = torch.zeros((args.buffer_size, args.num_steps, md.num_particles, 3), device=args.device)
         self.log_reward = torch.zeros(args.buffer_size, device=args.device)
+        self.target_positions = torch.zeros((args.buffer_size, 1, md.num_particles, 3), device=args.device)
 
         self.idx = 0
         self.buffer_size = args.buffer_size
@@ -153,8 +157,8 @@ class ReplayBuffer:
         indices = torch.arange(self.idx, self.idx+self.num_samples) % self.buffer_size
         self.idx += self.num_samples
 
-        self.positions[indices], self.actions[indices], self.log_reward[indices] = data
+        self.positions[indices], self.actions[indices], self.log_reward[indices], self.target_positions[indices] = data
         
     def sample(self):
         indices = torch.randperm(min(self.idx, self.buffer_size))[:self.num_samples]
-        return self.positions[indices], self.actions[indices], self.log_reward[indices]
+        return self.positions[indices], self.actions[indices], self.log_reward[indices], self.target_positions[indices]

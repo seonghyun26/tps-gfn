@@ -1,13 +1,14 @@
 current_date=$(date "+%m%d-%H%M%S")
-# echo $current_date
 echo ">> Training alanine"
 sleep 0.5
 
-for seed in {0..7}; do
+for seed in 1; do
   echo "Training seed $seed"
-  CUDA_VISIBLE_DEVICES=$seed python src/train.py \
+  CUDA_VISIBLE_DEVICES=2 python src/train.py \
     --date $current_date \
+    --project multi-goal \
+    --config configs/alanine/debug.yaml \
     --seed $seed \
-    --config configs/alanine/tune-$1.yaml &
+    --wandb
   sleep 1
 done

@@ -48,8 +48,10 @@ class Metric:
     def cv_metrics(self, positions, target_position, potentials):
         etps, efps, etp_idxs, efp_idxs = [], [], [], []
 
-        target_psi = compute_dihedral(target_position[:, self.angle_1].unsqueeze(0))
-        target_phi = compute_dihedral(target_position[:, self.angle_2].unsqueeze(0))
+        # target_psi = compute_dihedral(target_position[:, :, self.angle_1].unsqueeze(0))
+        # target_phi = compute_dihedral(target_position[:, :, self.angle_2].unsqueeze(0))
+        target_psi = compute_dihedral(target_position[:, :, self.angle_1])
+        target_phi = compute_dihedral(target_position[:, :, self.angle_2])
 
         psi = compute_dihedral(positions[:, :, self.angle_1])
         phi = compute_dihedral(positions[:, :, self.angle_2])
@@ -69,7 +71,7 @@ class Metric:
                 efps.append(efp)
                 efp_idxs.append(hit_idx.item())
 
-        if len(etps)>0:
+        if len(etps) > 0:
             etps = torch.tensor(etps)
             efps = torch.tensor(efps)
 

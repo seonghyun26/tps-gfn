@@ -80,7 +80,7 @@ def set_optimizer(name, parameters, lr, args=None):
     
     return optimizer
 
-def set_scheduler(name, optimizer, args=None):
+def set_scheduler(name, optimizer, lr=0.0001, args=None):
     name = name.lower() if name is not None else None
     
     if name == None or name == "":
@@ -93,9 +93,9 @@ def set_scheduler(name, optimizer, args=None):
     elif name == "cosineanneal":
         scheduler = CosineAnnealingLR(optimizer, T_max=1000, eta_min=0.00001)
     elif name == "cosineannealwarmrestarts":
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=400, T_mult=2, eta_min=0.00001)
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=args.num_rollouts, T_mult=2, eta_min=0.000001)
     elif name == "cosineannealwarmuprestarts":
-        scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=args.num_rollouts, T_mult=1, T_up=50)
+        scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=args.num_rollouts, T_mult=1, T_up=50, eta_max=lr)
     elif name == "plateau":
         scheduler = ReduceLROnPlateau(optimizer, 'min')
     else:

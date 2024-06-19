@@ -152,8 +152,13 @@ def plot_paths_alanine(save_dir, rollout, positions, target_position, last_idx):
     
     psis_target = []
     phis_target = []
-    psis_target.append(compute_dihedral(target_position[0, angle_1, :]))
-    phis_target.append(compute_dihedral(target_position[0, angle_2, :]))
+    # psis_target.append(compute_dihedral(target_position[0, angle_1, :]))
+    # psis_target.append(compute_dihedral(target_position[0, angle_2, :]))
+    
+    psis_target.append(compute_dihedral(target_position[0, 0, angle_1, :]))
+    psis_target.append(compute_dihedral(target_position[1, 0, angle_1, :]))
+    phis_target.append(compute_dihedral(target_position[0, 0, angle_2, :]))
+    phis_target.append(compute_dihedral(target_position[1, 0, angle_2, :]))
     ax.scatter(phis_target, psis_target, edgecolors='w', c='w', zorder=100, s=10)
 
     plt.xlabel('phi')

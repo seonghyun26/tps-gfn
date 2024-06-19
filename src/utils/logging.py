@@ -89,7 +89,7 @@ class Logger():
         if self.wandb:
             log = {
                     'loss': loss,
-                    'log_z': policy.log_z.item(),
+                    # 'log_z': policy.log_z.item(),
                     'll': ll,
                     'epd': pd,
                     'epcd': pcd,
@@ -114,7 +114,7 @@ class Logger():
 
             wandb.log(log, step=rollout)
 
-        self.logger.info(f"log_z: {policy.log_z.item()}")
+        # self.logger.info(f"log_z: {policy.log_z.item()}")
         self.logger.info(f"ll: {ll}")
         self.logger.info(f"epd: {pd}")
         self.logger.info(f"epcd: {pcd}")

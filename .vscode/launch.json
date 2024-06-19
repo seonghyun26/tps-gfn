@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Train",
+      "name": "Debug",
       "type": "debugpy",
       "request": "launch",
       "env": { "CUDA_VISIBLE_DEVICES": "0"},
@@ -15,7 +15,25 @@
         "--date",
         "debug",
         "--project",
-        "tps-tune",
+        "multi-goal",
+        "--config",
+        "configs/alanine/debug.yaml"
+      ]
+    },
+    {
+      "name": "Train",
+      "type": "debugpy",
+      "request": "launch",
+      "env": { "CUDA_VISIBLE_DEVICES": "1"},
+      "program": "src/train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--date",
+        "reproduce",
+        "--project",
+        "multigoal",
+        "--config",
+        "configs/alanine/reproduce.yaml"
       ]
     }
   ]

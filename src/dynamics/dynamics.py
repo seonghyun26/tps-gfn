@@ -1,3 +1,4 @@
+import torch
 import openmm as mm
 from openmm import app
 import openmm.unit as unit
