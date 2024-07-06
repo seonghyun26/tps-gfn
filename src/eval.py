@@ -21,7 +21,7 @@ if __name__ == '__main__':
     logger = Logger(args, md)
 
     logger.info(f"Initialize {args.num_samples} MDs starting at {args.start_state}")
-    mds = MDs(args)
+    mds = MDs(args, logger)
 
     model_path = args.model_path if args.model_path else os.path.join(args.save_dir, args.project, args.date, 'train', str(args.seed), 'policy.pt')
     agent.policy.load_state_dict(torch.load(model_path))

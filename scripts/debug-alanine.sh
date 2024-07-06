@@ -4,7 +4,7 @@ sleep 0.5
 
 for seed in 1; do
   echo "Training seed $seed"
-  CUDA_VISIBLE_DEVICES=2 python src/train.py \
+  CUDA_VISIBLE_DEVICES=4 python src/train.py \
     --date $current_date \
     --project multi-goal \
     --config configs/alanine/debug.yaml \

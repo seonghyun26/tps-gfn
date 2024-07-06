@@ -20,13 +20,16 @@ class FlowNetAgent:
             self.replay = ReplayBuffer(args, md)
         
         # Set optimizer and scheduler for log z, mlp
-        self.log_z_optimizer = set_optimizer(args.log_z_optimizer, self.policy.log_z.parameters(), args.log_z_lr)    
+        self.log_z_optimizer = set_optimizer(args.log_z_optimizer, [self.policy.log_z], args.log_z_lr)    
         self.log_z_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_optimizer, lr=args.log_z_lr, args=args)
         self.mlp_optimizer = set_optimizer(args.mlp_optimizer, self.policy.mlp.parameters(), args.mlp_lr) 
         self.mlp_scheduler = set_scheduler(args.mlp_scheduler, self.mlp_optimizer, lr=args.mlp_lr, args=args)
         self.log_z_lr = self.log_z_optimizer.param_groups[0]['lr'] if self.log_z_scheduler is not None else args.log_z_lr
         self.mlp_lr = self.mlp_optimizer.param_groups[0]['lr'] if self.mlp_scheduler is not None else args.mlp_lr
         
+        self.log_z_2_optimizer = set_optimizer(args.log_z_optimizer, [self.policy.log_z_2], args.log_z_lr)    
+        self.log_z_2_scheduler = set_scheduler(args.log_z_scheduler, self.log_z_2_optimizer, lr=args.log_z_lr, args=args)
+        self.log_z_2_lr = self.log_z_2_optimizer.param_groups[0]['lr'] if self.log_z_2_scheduler is not None else args.log_z_lr
 
     def sample(self, args, mds, temperature):
         positions = torch.zeros((args.num_samples, args.num_steps+1, self.num_particles, 3), device=args.device)
@@ -90,6 +93,7 @@ class FlowNetAgent:
 
         if args.type == 'train':
             self.replay.add((positions, actions, log_reward, mds.target_positions))
+            # TODO: HER add transition with additional goals
         
         log = {
             'actions': actions,
@@ -111,20 +115,24 @@ class FlowNetAgent:
         biases = self.f_scale * biases / self.masses
         
         # start_n_goal = torch.stack((positions[:, 0].reshape(args.num_samples, -1), target_positions))
-        start_n_goal = torch.cat((positions[:, 0].reshape(args.num_samples, -1), target_positions.squeeze().reshape(args.num_samples, -1)), dim=1)
-        log_z = self.policy.log_z(start_n_goal)
+        # start_n_goal = torch.cat((positions[:, 0].reshape(args.num_samples, -1), target_positions.squeeze().reshape(args.num_samples, -1)), dim=1)
+        log_z = self.policy.log_z + self.policy.log_z_2
         log_forward = -0.5 * torch.square((biases-actions)/self.std).mean((1, 2, 3))
         loss = (log_z+log_forward-log_reward).square().mean() 
         
         loss.backward()
         
-        torch.nn.utils.clip_grad_norm_(self.policy.log_z.parameters(), args.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_([self.policy.log_z], args.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_([self.policy.log_z_2], args.max_grad_norm)
         torch.nn.utils.clip_grad_norm_(self.policy.mlp.parameters(), args.max_grad_norm)
         
         self.mlp_optimizer.step()
         self.log_z_optimizer.step()
         self.mlp_optimizer.zero_grad()
         self.log_z_optimizer.zero_grad()
+        
+        self.log_z_2_optimizer.step()
+        self.log_z_2_optimizer.zero_grad()
         
         return loss.item()
     
@@ -141,6 +149,10 @@ class FlowNetAgent:
             else:
                 self.mlp_scheduler.step()
             self.mlp_lr = self.mlp_optimizer.param_groups[0]['lr']
+            
+    def target_positions2keys(self, target_positions):
+        print(target_positions.shape)
+        return 1
 
 class ReplayBuffer:
     def __init__(self, args, md):

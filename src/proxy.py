@@ -27,12 +27,13 @@ class Alanine(nn.Module):
             nn.Linear(128, self.output_dim, bias=False)
         )
 
-        # self.log_z = nn.Parameter(torch.tensor(0.))
-        self.log_z = nn.Sequential(
-            nn.Linear(self.input_dim * 2, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )
+        self.log_z = nn.Parameter(torch.tensor(0.))
+        self.log_z_2 = nn.Parameter(torch.tensor(0.))
+        # self.log_z = nn.Sequential(
+        #     nn.Linear(self.input_dim * 2, 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 1)
+        # )
 
         self.to(args.device)
 

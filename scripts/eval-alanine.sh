@@ -1,5 +1,9 @@
-CUDA_VISIBLE_DEVICES=7 python src/eval.py \
+echo ">> Evaluating alanine"
+sleep 0.5
+
+CUDA_VISIBLE_DEVICES=1 python src/eval.py \
   --type eval \
-  --config configs/alanine/tune-cosannrestart.yaml \
-  --date 0612-015704 \
-  --seed 5
+  --project multi-goal \
+  --config configs/alanine/debug.yaml \
+  --date 0619-034844 \
+  --seed 1

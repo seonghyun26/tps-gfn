@@ -21,7 +21,7 @@ temperature: 300
 # Sampling
 force: False
 num_samples: 8
-bias_scale: 20
+bias_scale: 0.01
 sigma: 0.05
 
 # Training
