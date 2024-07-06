@@ -64,10 +64,10 @@
 ## Results
 
 **Alanine Dipeptide**
-![3D trajectory of Alanine Dipeptide](alanine.gif)
+![3D trajectory of Alanine Dipeptide](pages/alanine.gif)
 
 **Polyproline**
-![3D trajectory of Polyproline](poly.gif)
+![3D trajectory of Polyproline](pages/poly.gif)
 
 **Chignolin**
-![3D trajectory of Chignolin](chignolin.gif)
+![3D trajectory of Chignolin](pages/chignolin.gif)
